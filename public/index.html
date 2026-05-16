@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vavilov OS - Intelligence Scheduler</title>
+    
+    <link rel="stylesheet" href="css/style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <div class="header-panel">
+        <div>
+            <h2>Vavilov OS <span style="font-size: 12px; color: #8b949e; font-weight: normal;">v12.5 Adaptative</span></h2>
+            <div class="view-tabs">
+                <button class="tab-btn active" onclick="switchView('grid', event)">≡ Grid Excel</button>
+                <button class="tab-btn" onclick="switchView('calendar', event)">📅 Calendário (Timeblock)</button>
+                <button class="tab-btn" onclick="switchView('analytics', event)">📊 Painel Analítico & Heatmap</button>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <select id="filtoDisciplinaHead" class="editable" style="background: var(--surf); color: #fff; padding: 6px; border-radius: 4px; border: 1px solid var(--brd);" onchange="filtrarPorDisciplina(this.value)">
+                <option value="">Todas as Disciplinas</option>
+            </select>
+            <button class="upload-btn" style="background: var(--danger); color: #fff;" onclick="excluirTudoGlobal()">⚠️ Limpar Tudo</button>
+            <input type="file" id="pdfFile" accept="application/pdf" style="display:none;">
+            <button class="upload-btn" id="btnUploadTrigger" onclick="document.getElementById('pdfFile').click()">+ Ingerir Edital (IA)</button>
+        </div>
+    </div>
+
+    <div style="background: var(--surf); padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--brd); display: flex; gap: 12px; align-items: center;">
+        <h4 style="margin:0; color:#fff; font-size:13px; min-width:120px;">⚙️ Painel de Adição:</h4>
+        <input type="text" id="manDisciplina" placeholder="Disciplina (Ex: Direito Administrativo)" style="background:#0d1117; color:#fff; border:1px solid var(--brd); padding:8px; border-radius:4px; flex:1; font-size:13px;">
+        <input type="text" id="manTopico" placeholder="Tópico de Estudo / Artigos / Conteúdo" style="background:#0d1117; color:#fff; border:1px solid var(--brd); padding:8px; border-radius:4px; flex:2; font-size:13px;">
+        <input type="number" id="manPeso" value="1" min="1" title="Peso de relevância da disciplina" style="background:#0d1117; color:#fff; border:1px solid var(--brd); padding:8px; border-radius:4px; width:70px; text-align:center; font-size:13px;">
+        <button class="upload-btn" style="padding:8px 20px; background: var(--succ); color: #fff;" onclick="adicionarTopicoManual()">Salvar no Planner</button>
+    </div>
+
+    <div style="background: var(--surf); padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--brd);">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:12px;">
+            <span>Evolução Estratégica do Edital Global</span>
+            <span id="progressBarPercent">0%</span>
+        </div>
+        <div style="background: #30363d; height: 10px; border-radius: 5px; overflow: hidden;">
+            <div id="progressBarFill" style="background: var(--succ); width: 0%; height: 100%; transition: width 0.4s ease;"></div>
+        </div>
+    </div>
+
+    <div id="view-grid" class="view-container active">
+        <div class="grid-container">
+            <div class="grid-header-row">
+                <div class="grid-cell">体积</div>
+                <div class="grid-cell">Disciplina</div>
+                <div class="grid-cell">Tópico</div>
+                <div class="grid-cell">Peso</div>
+                <div class="grid-cell">Estudo</div>
+                <div class="grid-cell">24h</div>
+                <div class="grid-cell">7d</div>
+                <div class="grid-cell">30d</div>
+                <div class="grid-cell">Ações</div>
+            </div>
+            <div id="gridBody"></div>
+        </div>
+    </div>
+
+    <div id="view-calendar" class="view-container">
+        <div style="display: flex; gap: 20px; height: calc(100vh - 260px);">
+            <div id="external-events" class="sidebar-events">
+                <h4>Backlog Pendente</h4>
+                <p style="font-size: 11px; color: #8b949e;">Arraste para o calendário</p>
+                <div id="calendar-backlog"></div>
+            </div>
+            <div id="calendar" style="flex: 1; background: var(--surf); padding: 15px; border-radius: 8px; border: 1px solid var(--brd);"></div>
+        </div>
+    </div>
+
+    <div id="view-analytics" class="view-container">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="background: var(--surf); padding: 20px; border-radius: 8px; border: 1px solid var(--brd);">
+                <h3>🚦 Zona de Calor de Produtividade (Heatmap)</h3>
+                <p style="font-size: 12px; color: #8b949e; margin-bottom: 15px;">Frequência longitudinal de sessões completadas</p>
+                <div id="heatmapContainer" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; max-width: 350px;"></div>
+            </div>
+            <div style="background: var(--surf); padding: 20px; border-radius: 8px; border: 1px solid var(--brd);">
+                <h3>📜 Rastro Digital de Aprendizado</h3>
+                <p style="font-size: 12px; color: #8b949e; margin-bottom: 15px;">Linha temporal em tempo real alimentada pelo Event Bus do servidor</p>
+                <div id="rastroTimeline" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" style="position: fixed; bottom: 20px; right: 20px; background: var(--surf); border: 1px solid var(--brd); padding: 12px 24px; border-radius: 6px; opacity: 0; transition: 0.3s; color: #fff; z-index: 9999;"></div>
+</body>
+</html>
