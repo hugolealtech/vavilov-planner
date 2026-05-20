@@ -79,16 +79,19 @@
     </div>
 
     <div id="view-analytics" class="view-container">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- Linha 1: Heatmap (largo) + Rastro (estreito) -->
+        <div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; margin-bottom: 20px;">
             <div style="background: var(--surf); padding: 20px; border-radius: 8px; border: 1px solid var(--brd);">
-                <h3>🚦 Zona de Calor de Produtividade (Heatmap)</h3>
-                <p style="font-size: 12px; color: #8b949e; margin-bottom: 15px;">Frequência longitudinal de sessões completadas</p>
-                <div id="heatmapContainer" style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; max-width: 350px;"></div>
+                <h3 style="margin-top:0;">🚦 Zona de Calor de Produtividade</h3>
+                <p style="font-size: 12px; color: #8b949e; margin-bottom: 15px;">Frequência de sessões nas últimas 12 semanas</p>
+                <div id="heatmapContainer"></div>
+                <!-- Cards de resumo e progresso por disciplina injetados aqui pelo JS -->
+                <div id="analyticsCards"></div>
             </div>
             <div style="background: var(--surf); padding: 20px; border-radius: 8px; border: 1px solid var(--brd);">
-                <h3>📜 Rastro Digital de Aprendizado</h3>
-                <p style="font-size: 12px; color: #8b949e; margin-bottom: 15px;">Linha temporal em tempo real alimentada pelo Event Bus do servidor</p>
-                <div id="rastroTimeline" style="max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;"></div>
+                <h3 style="margin-top:0;">📜 Rastro Digital de Aprendizado</h3>
+                <p style="font-size: 12px; color: #8b949e; margin-bottom: 15px;">Histórico das últimas 30 ações registradas</p>
+                <div id="rastroTimeline" style="max-height: 520px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
             </div>
         </div>
     </div>

@@ -328,50 +328,177 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ── Analytics: Heatmap ───────────────────────────────────────
+    // ── Analytics: Heatmap com grade de calendário ──────────────
     window.renderHeatmap = async function() {
         const container = document.getElementById('heatmapContainer');
         if (!container) return;
-        container.innerHTML = 'Buscando métricas...';
+        container.innerHTML = '<p style="font-size:11px;color:#8b949e;">Carregando heatmap...</p>';
         try {
             const res  = await fetch('/api/analytics/heatmap');
             const data = await res.json();
-            container.innerHTML = '';
-            if (data.length === 0) {
-                container.innerHTML = '<p style="font-size:11px;color:#8b949e;">Sem sessões registradas.</p>';
-                return;
+
+            // Constrói mapa de data→count para lookup rápido
+            const countMap = {};
+            data.forEach(d => { countMap[d.date] = d.count; });
+
+            // Gera os últimos 84 dias (12 semanas)
+            const hoje = new Date();
+            const dias = [];
+            for (let i = 83; i >= 0; i--) {
+                const d = new Date(hoje);
+                d.setDate(hoje.getDate() - i);
+                dias.push(d.toISOString().split('T')[0]);
             }
-            data.forEach(d => {
-                const block = document.createElement('div');
-                block.style.cssText = 'width:30px;height:30px;border-radius:4px;';
-                const alpha = Math.min(d.count * 0.25, 1);
-                block.style.backgroundColor = `rgba(35,134,54,${alpha})`;
-                block.title = `${d.date}: ${d.count} execução(ões)`;
-                container.appendChild(block);
+
+            const maxCount = Math.max(1, ...data.map(d => d.count));
+
+            // Monta HTML da grade
+            const diasSemana = ['D','S','T','Q','Q','S','S'];
+            let html = '<div style="font-size:10px;color:#8b949e;margin-bottom:8px;">Últimas 12 semanas de atividade</div>';
+            
+            // Labels dos dias da semana
+            html += '<div style="display:grid;grid-template-columns:18px repeat(12,1fr);gap:3px;margin-bottom:2px;">';
+            html += '<div></div>';
+            // labels das semanas (mês abreviado quando muda)
+            let mesAtual = '';
+            for (let col = 0; col < 12; col++) {
+                const diaCol = new Date(hoje);
+                diaCol.setDate(hoje.getDate() - (11 - col) * 7);
+                const mes = diaCol.toLocaleDateString('pt-BR', { month: 'short' });
+                if (mes !== mesAtual) {
+                    html += `<div style="font-size:9px;color:#8b949e;text-align:center;">${mes}</div>`;
+                    mesAtual = mes;
+                } else {
+                    html += '<div></div>';
+                }
+            }
+            html += '</div>';
+
+            // Grade 7 linhas × 12 colunas
+            html += '<div style="display:grid;grid-template-columns:18px repeat(12,1fr);gap:3px;">';
+            for (let row = 0; row < 7; row++) {
+                html += `<div style="font-size:9px;color:#8b949e;display:flex;align-items:center;">${diasSemana[row]}</div>`;
+                for (let col = 0; col < 12; col++) {
+                    const idx = col * 7 + row;
+                    if (idx >= dias.length) { html += '<div></div>'; continue; }
+                    const dateStr = dias[idx];
+                    const count = countMap[dateStr] || 0;
+                    const alpha = count === 0 ? 0 : 0.2 + (count / maxCount) * 0.8;
+                    const bg = count === 0
+                        ? '#21262d'
+                        : `rgba(35,134,54,${alpha.toFixed(2)})`;
+                    const label = count === 0
+                        ? `${dateStr}: nenhuma sessão`
+                        : `${dateStr}: ${count} sessão(ões)`;
+                    html += `<div title="${label}" style="width:100%;aspect-ratio:1;border-radius:3px;background:${bg};cursor:default;"></div>`;
+                }
+            }
+            html += '</div>';
+
+            // Legenda
+            html += '<div style="display:flex;align-items:center;gap:4px;margin-top:10px;font-size:10px;color:#8b949e;">';
+            html += '<span>Menos</span>';
+            ['#21262d','rgba(35,134,54,0.3)','rgba(35,134,54,0.55)','rgba(35,134,54,0.75)','rgba(35,134,54,1)'].forEach(c => {
+                html += `<div style="width:12px;height:12px;border-radius:2px;background:${c};"></div>`;
             });
-        } catch (e) { container.innerHTML = 'Erro ao processar mapa.'; }
+            html += '<span>Mais</span></div>';
+
+            container.innerHTML = html;
+
+            // Cards de resumo abaixo do heatmap
+            await renderSummaryCards();
+
+        } catch (e) { container.innerHTML = '<p style="color:var(--danger);font-size:12px;">Erro ao processar heatmap.</p>'; }
     };
+
+    // ── Cards de resumo geral (independe de ter sessões registradas) ──
+    async function renderSummaryCards() {
+        let summaryEl = document.getElementById('analyticsCards');
+        if (!summaryEl) return;
+        try {
+            const res  = await fetch('/api/analytics/summary');
+            const data = await res.json();
+            const t = data.totais || {};
+            const total     = t.total || 0;
+            const concluidos = t.concluidos || 0;
+            const perc      = total > 0 ? Math.round((concluidos / total) * 100) : 0;
+
+            let cardsHtml = `
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px;">
+                    <div style="background:#21262d;border-radius:8px;padding:14px;text-align:center;">
+                        <div style="font-size:24px;font-weight:bold;color:#fff;">${total}</div>
+                        <div style="font-size:11px;color:#8b949e;margin-top:4px;">Tópicos no Edital</div>
+                    </div>
+                    <div style="background:#21262d;border-radius:8px;padding:14px;text-align:center;">
+                        <div style="font-size:24px;font-weight:bold;color:var(--succ);">${concluidos}</div>
+                        <div style="font-size:11px;color:#8b949e;margin-top:4px;">Estudados</div>
+                    </div>
+                    <div style="background:#21262d;border-radius:8px;padding:14px;text-align:center;">
+                        <div style="font-size:24px;font-weight:bold;color:var(--acc);">${perc}%</div>
+                        <div style="font-size:11px;color:#8b949e;margin-top:4px;">Progresso Geral</div>
+                    </div>
+                    <div style="background:#21262d;border-radius:8px;padding:14px;text-align:center;">
+                        <div style="font-size:24px;font-weight:bold;color:#d29922;">${t.rev1_total || 0}</div>
+                        <div style="font-size:11px;color:#8b949e;margin-top:4px;">Revisões 24h</div>
+                    </div>
+                </div>`;
+
+            // Top disciplinas
+            if (data.disciplinas && data.disciplinas.length > 0) {
+                cardsHtml += '<div style="margin-top:16px;"><div style="font-size:12px;color:#8b949e;margin-bottom:8px;">Progresso por Disciplina</div>';
+                data.disciplinas.forEach(d => {
+                    const p = d.total > 0 ? Math.round((d.concluidos / d.total) * 100) : 0;
+                    cardsHtml += `
+                        <div style="margin-bottom:8px;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
+                                <span>${d.disciplina}</span>
+                                <span style="color:#8b949e;">${d.concluidos}/${d.total} • ${p}%</span>
+                            </div>
+                            <div style="background:#30363d;height:5px;border-radius:3px;overflow:hidden;">
+                                <div style="background:var(--succ);width:${p}%;height:100%;transition:width 0.4s;"></div>
+                            </div>
+                        </div>`;
+                });
+                cardsHtml += '</div>';
+            }
+
+            summaryEl.innerHTML = cardsHtml;
+        } catch(e) { /* silencioso */ }
+    }
 
     // ── Analytics: Rastro ────────────────────────────────────────
     window.renderRastro = async function() {
         const timeline = document.getElementById('rastroTimeline');
         if (!timeline) return;
-        timeline.innerHTML = 'Buscando logs...';
+        timeline.innerHTML = '<p style="font-size:11px;color:#8b949e;">Carregando rastro...</p>';
         try {
             const res  = await fetch('/api/analytics/rastro');
             const data = await res.json();
             timeline.innerHTML = '';
             if (data.length === 0) {
-                timeline.innerHTML = '<p style="font-size:11px;color:#8b949e;">Linha do tempo vazia.</p>';
+                timeline.innerHTML = `
+                    <div style="text-align:center;padding:20px;color:#8b949e;">
+                        <div style="font-size:24px;margin-bottom:8px;">📭</div>
+                        <div style="font-size:12px;">Nenhuma sessão registrada ainda.</div>
+                        <div style="font-size:11px;margin-top:4px;">Marque tópicos como estudados no Grid para popular o rastro.</div>
+                    </div>`;
                 return;
             }
+            const labels = { concluido: '✅ Estudo', rev1: '🔁 Rev. 24h', rev2: '🔁 Rev. 7d', rev3: '🔁 Rev. 30d' };
             data.forEach(s => {
                 const item = document.createElement('div');
-                item.style.cssText = 'background:#21262d;padding:8px;border-radius:4px;font-size:12px;';
-                item.innerHTML = `⏱️ <b>${s.data_inicio}</b> — Ação [<b>${s.tipo_evento}</b>] em <span style="color:var(--acc)">${s.disciplina}</span>: <i>${s.topico}</i>`;
+                item.style.cssText = 'background:#21262d;padding:10px 12px;border-radius:6px;font-size:12px;border-left:3px solid var(--acc);';
+                const label = labels[s.tipo_evento] || s.tipo_evento;
+                item.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                        <span style="color:var(--acc);font-weight:bold;">${label}</span>
+                        <span style="color:#8b949e;font-size:11px;">${s.data_inicio}</span>
+                    </div>
+                    <div style="color:#c9d1d9;">${s.disciplina}</div>
+                    <div style="color:#8b949e;font-size:11px;margin-top:2px;">${s.topico}</div>`;
                 timeline.appendChild(item);
             });
-        } catch (e) { timeline.innerHTML = 'Erro ao ler rastro.'; }
+        } catch (e) { timeline.innerHTML = '<p style="color:var(--danger);font-size:12px;">Erro ao ler rastro.</p>'; }
     };
 
     // ══════════════════════════════════════════════════════════════
@@ -441,13 +568,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window.calendarInstance) {
             window.calendarInstance = new FullCalendar.Calendar(el, {
                 initialView: 'timeGridWeek',
-                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth' },
-                views: {
-                    listMonth: { buttonText: '☰ Lista' },
-                    dayGridMonth: { buttonText: 'Mês' },
-                    timeGridWeek: { buttonText: 'Semana' },
-                    timeGridDay: { buttonText: 'Dia' }
-                },
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay' },
                 locale: 'pt-br',
                 editable: true,
                 droppable: true,
