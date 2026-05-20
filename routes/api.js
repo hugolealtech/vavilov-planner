@@ -60,7 +60,23 @@ router.post('/topics', (req, res) => {
     });
 });
 
-// 3. DELETE /api/topics/:id - Soft Delete Compatível com app.js
+// 2b. POST /api/topics/:id/child - Criação de Subtópico Filho (hierarquia infinita)
+router.post('/topics/:id/child', (req, res) => {
+    const parent_id = parseInt(req.params.id);
+    db.get("SELECT * FROM edital_atual WHERE id = ? AND is_deleted = 0", [parent_id], (err, parent) => {
+        if (err || !parent) return res.status(404).json({ error: "Tópico pai não encontrado." });
+
+        const topico  = req.body.topico || "Novo subtópico";
+        const cor     = parent.cor_hex || '#58a6ff';
+        const query   = `INSERT INTO edital_atual 
+            (semana, disciplina, topico, peso, prioridade, cor_hex, is_deleted, concluido, rev1, rev2, rev3, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, ?)`;
+        db.run(query, [parent.semana, parent.disciplina, topico, parent.peso || 1, parent.prioridade || 'Normal', cor, parent_id], function(insErr) {
+            if (insErr) return res.status(500).json({ error: insErr.message });
+            res.json({ success: true, id: this.lastID });
+        });
+    });
+});
 router.delete('/topics/:id', (req, res) => {
     const id = req.params.id;
     const timestamp = new Date().toISOString();
@@ -131,36 +147,13 @@ router.get('/analytics/heatmap', (req, res) => {
     });
 });
 
-// 6b. GET /api/analytics/summary - Resumo geral para o painel (independe de sessões)
-router.get('/analytics/summary', (req, res) => {
-    db.get(`SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN concluido = 1 THEN 1 ELSE 0 END) as concluidos,
-                SUM(CASE WHEN rev1 = 1 THEN 1 ELSE 0 END) as rev1_total,
-                SUM(CASE WHEN rev2 = 1 THEN 1 ELSE 0 END) as rev2_total,
-                SUM(CASE WHEN rev3 = 1 THEN 1 ELSE 0 END) as rev3_total
-            FROM edital_atual WHERE is_deleted = 0`, [], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
-        
-        db.all(`SELECT disciplina, COUNT(*) as total, 
-                       SUM(CASE WHEN concluido = 1 THEN 1 ELSE 0 END) as concluidos
-                FROM edital_atual WHERE is_deleted = 0 
-                GROUP BY disciplina ORDER BY concluidos DESC`, [], (err2, discs) => {
-            if (err2) return res.status(500).json({ error: err2.message });
-            res.json({ totais: row || {}, disciplinas: discs || [] });
-        });
-    });
-});
-
 // 7. GET /api/analytics/rastro - Histórico de Tracing Longitudinal
-// LEFT JOIN garante que sessões de tópicos deletados ainda apareçam no rastro
 router.get('/analytics/rastro', (req, res) => {
-    db.all(`SELECT s.id, s.data_inicio, s.tipo_evento, 
-                   COALESCE(e.disciplina, '[Removido]') as disciplina, 
-                   COALESCE(e.topico, 'Tópico removido') as topico
+    db.all(`SELECT s.id, s.data_inicio, s.tipo_evento, e.disciplina, e.topico 
             FROM study_sessions s 
-            LEFT JOIN edital_atual e ON s.topico_id = e.id 
-            ORDER BY s.id DESC LIMIT 30`, [], (err, rows) => {
+            JOIN edital_atual e ON s.topico_id = e.id 
+            WHERE e.is_deleted = 0
+            ORDER BY s.id DESC LIMIT 15`, [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(rows || []);
     });

@@ -61,6 +61,7 @@ db.serialize(() => {
     addCol("is_deleted BOOLEAN DEFAULT 0");
     addCol("deleted_at DATETIME");
     addCol("concurso_id INTEGER DEFAULT 1");
+    addCol("parent_id INTEGER DEFAULT NULL");  // suporte a subtópicos filhos ilimitados
 
     // 3. Tabela de Logs e Auditoria de Lixeira
     db.run(`CREATE TABLE IF NOT EXISTS lixeira_eventos (
