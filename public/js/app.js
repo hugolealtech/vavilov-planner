@@ -38,7 +38,8 @@ window.switchView = function(viewName, e) {
     if (viewName === 'analytics') {
         if (typeof window.renderHeatmap === 'function') window.renderHeatmap();
         if (typeof window.renderRastro  === 'function') window.renderRastro();
-        if (typeof window.renderRevisoesInteligentes === 'function') window.renderRevisoesInteligentes(); // NOVA LINHA
+        if (typeof window.renderRevisoesInteligentes === 'function') window.renderRevisoesInteligentes();
+        if (typeof window.renderRadar === 'function') window.renderRadar();
     }
 };
 
@@ -382,20 +383,47 @@ document.addEventListener('DOMContentLoaded', () => {
             // Renderiza cada item raiz com seus filhos recursivos
             itensRaiz.forEach(t => renderItemRecursivo(listEl, t, 0));
 
-            // Sortable apenas nos itens raiz (arrastar entre raízes)
+            // Sortable nos itens raiz — filhos acompanham o pai (FIX drag hierárquico)
             if (typeof Sortable !== 'undefined') {
                 Sortable.create(listEl, {
                     handle: '.drag-handle',
                     animation: 150,
                     ghostClass: 'ghost',
+                    // Só permite arrastar linhas raiz (data-id sem parent)
+                    filter: function(e, target) {
+                        const id = parseInt(target.getAttribute('data-id'));
+                        const item = localData.find(t => t.id === id);
+                        return item && item.parent_id; // bloqueia filhos
+                    },
                     onEnd: async function(evt) {
-                        const movedId  = evt.item.getAttribute('data-id');
+                        const movedId  = parseInt(evt.item.getAttribute('data-id'));
                         const novaOrdem = evt.newIndex;
+
+                        // Move o pai
                         await fetch('/api/topics/reorder', {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ id: movedId, novaSemana: disciplina, novaOrdem })
                         });
+
+                        // FIX drag: coleta todos os descendentes e atualiza semana/ordem deles também
+                        function descendentes(pid) {
+                            const filhos = localData.filter(t => t.parent_id === pid);
+                            let todos = [...filhos];
+                            filhos.forEach(f => { todos = todos.concat(descendentes(f.id)); });
+                            return todos;
+                        }
+                        const desc = descendentes(movedId);
+                        for (let i = 0; i < desc.length; i++) {
+                            await fetch('/api/topics/reorder', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: desc[i].id, novaSemana: disciplina, novaOrdem: novaOrdem + i + 1 })
+                            });
+                        }
+
+                        // Após mover, re-renderiza para refletir a nova ordem visual
+                        await loadData();
                     }
                 });
             }
@@ -817,6 +845,17 @@ if (fileInput) {
             const editavel = checkbox.closest('.grid-row').querySelectorAll('[contenteditable]')[0];
             if (editavel) editavel.style.textDecoration = 'none';
             await salvarInline(id, 'concluido', checkbox);
+            // FIX: limpa data_agendada local para que re-marcar funcione e atualize o timeblock
+            // (banco mantém a data, mas aqui forçamos o reagendamento ao marcar novamente)
+            item.data_agendada = null;
+            item.horario_inicio = null;
+            // Remove o evento do calendário visualmente (o item vai para o backlog)
+            if (window.calendarInstance) {
+                const ev = window.calendarInstance.getEventById(id.toString());
+                if (ev) ev.remove();
+            }
+            syncCalendarBacklog();
+            showToast('↩️ Tópico desmarcado. Marque novamente quando estudar.');
             return;
         }
 
@@ -868,7 +907,83 @@ if (fileInput) {
         await salvarInline(id, field, checkbox);
     };
 
-    // Montador do Novo Grid de Inteligência na aba Analytics
+    // ══════════════════════════════════════════════════════════════
+    // RADAR DE PRIORIDADES — cruza peso, conclusão e urgência Iudex
+    // Classifica disciplinas em: 🔴 Atenção Imediata / 🟡 Em dia / 🟢 Dominada / ⚪ Não iniciada
+    // ══════════════════════════════════════════════════════════════
+    window.renderRadar = function() {
+        const container = document.getElementById('radarContainer');
+        if (!container) return;
+
+        // Agrupa todos os tópicos por disciplina
+        const discMap = {};
+        localData.forEach(t => {
+            if (!discMap[t.disciplina]) discMap[t.disciplina] = [];
+            discMap[t.disciplina].push(t);
+        });
+
+        const disciplinas = Object.keys(discMap).sort((a, b) => {
+            const pesoA = Math.max(...discMap[a].map(t => t.peso || 1));
+            const pesoB = Math.max(...discMap[b].map(t => t.peso || 1));
+            return pesoB - pesoA; // ordena por peso máximo desc
+        });
+
+        if (disciplinas.length === 0) {
+            container.innerHTML = '<p style="font-size:11px;color:#8b949e;">Nenhuma disciplina cadastrada.</p>';
+            return;
+        }
+
+        let html = '';
+        disciplinas.forEach(disc => {
+            const itens = discMap[disc];
+            const total = itens.length;
+            const concluidos = itens.filter(t => t.concluido).length;
+            const perc = total ? Math.round((concluidos / total) * 100) : 0;
+            const pesoMax = Math.max(...itens.map(t => t.peso || 1));
+
+            // Calcula urgência: quantos itens concluídos têm revisão urgente (intervalo<=1)?
+            const urgentes = itens.filter(t => {
+                if (!t.concluido) return false;
+                let q = t.peso || 1, intervalo = 1, estagio = 1;
+                if (t.rev3) { intervalo = 30; estagio = 4; }
+                else if (t.rev2) { intervalo = 7; estagio = 3; }
+                else if (t.rev1) { intervalo = 1; estagio = 2; }
+                return calcularVavilovIudex(q, intervalo, 2.5, estagio).novoIntervalo <= 1;
+            }).length;
+
+            // Classificação
+            let status, cor, icone;
+            if (concluidos === 0) {
+                status = 'Não iniciada'; cor = '#4a6070'; icone = '⚪';
+            } else if (urgentes > 0) {
+                status = `${urgentes} revisão(ões) urgente(s)`; cor = 'var(--danger)'; icone = '🔴';
+            } else if (perc < 40 && pesoMax >= 3) {
+                status = 'Pouco estudada — peso alto'; cor = '#d29922'; icone = '🟡';
+            } else if (perc >= 80) {
+                status = 'Bem coberta'; cor = 'var(--succ)'; icone = '🟢';
+            } else {
+                status = 'Em progresso'; cor = '#58a6ff'; icone = '🔵';
+            }
+
+            html += `
+                <div style="padding:10px 0;border-bottom:1px solid var(--brd);">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;">
+                        <div style="font-size:12px;font-weight:bold;color:#fff;flex:1;padding-right:8px;">${icone} ${disc}</div>
+                        <div style="font-size:10px;color:${cor};white-space:nowrap;">${status}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="flex:1;background:#30363d;height:4px;border-radius:2px;overflow:hidden;">
+                            <div style="background:${cor};width:${perc}%;height:100%;transition:width 0.4s;"></div>
+                        </div>
+                        <div style="font-size:10px;color:#8b949e;white-space:nowrap;">${concluidos}/${total} • P${pesoMax}</div>
+                    </div>
+                </div>`;
+        });
+
+        container.innerHTML = html;
+    };
+
+    // ── Montador do Novo Grid de Inteligência na aba Analytics
     window.renderRevisoesInteligentes = function() {
         const container = document.getElementById('iudexContainer');
         if (!container) return;
@@ -999,6 +1114,8 @@ if (fileInput) {
         });
         item.data_agendada = novaDataStr;
         syncCalendar();
+        // FIX4: re-renderiza Iudex para remover o item agendado da tabela de urgentes
+        window.renderRevisoesInteligentes();
         showToast(`🧠 Iudex XII: Agendado para ${novaDataStr} (+${dias} dias)!`);
     };
 
