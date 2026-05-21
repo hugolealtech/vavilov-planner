@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Salvar Inline (checkbox / texto) ─────────────────────────
     // FIX 3: após gravar "concluido", propaga estado ao evento do calendário
     window.salvarInline = async function(id, field, element) {
-        let value = element.type === 'checkbox' ? element.checked : element.innerText.trim();
+        let value = element.type === 'checkbox' ? element.checked : (element.tagName === 'SELECT' ? element.value : element.innerText.trim());
         if (element.type === 'checkbox') value = value ? 1 : 0;
 
         try {
@@ -307,8 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="grid-cell editable" contenteditable="true"
                      onblur="salvarInline(${t.id}, 'topico', this)"
                      style="${textoStyle}">${t.topico}</div>
-                <div class="grid-cell editable" contenteditable="true"
-                     onblur="salvarInline(${t.id}, 'peso', this)">${t.peso || 1}</div>
+                <div class="grid-cell" style="padding: 0;">
+                    <select onchange="salvarInline(${t.id}, 'peso', this)" style="background: transparent; color: #fff; border: 1px solid transparent; cursor: pointer; font-size: 13px; width: 100%; height: 100%; outline: none; appearance: none; text-align: center;">
+                        <option value="1" style="background: #0d1117;" ${t.peso == 1 ? 'selected' : ''}>Baixo (1)</option>
+                        <option value="3" style="background: #0d1117;" ${t.peso == 3 ? 'selected' : ''}>Médio (3)</option>
+                        <option value="5" style="background: #0d1117;" ${t.peso == 5 ? 'selected' : ''}>Alto (5)</option>
+                    </select>
+                </div>
                      
                 <div class="grid-cell center-cell">
                     <input type="checkbox" ${t.concluido ? 'checked' : ''} onchange="toggleRevisao(${t.id}, 'concluido', this)">
@@ -700,28 +705,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Upload de Edital PDF ─────────────────────────────────────
-    const fileInput = document.getElementById('pdfFile');
-    if (fileInput) {
-        fileInput.addEventListener('change', async function() {
-            const file = this.files[0];
-            if (!file) return;
-            const formData = new FormData();
-            formData.append("edital", file);
-            showToast("Iniciando Ingestão Adaptativa...");
-            try {
-                const response = await fetch('/api/upload-edital', { method: 'POST', body: formData });
-                if (response.ok) {
-                    showToast("Edital processado com sucesso!");
-                    await loadData();
-                } else {
-                    showToast("Falha estrutural no processamento do arquivo", true);
-                }
-            } catch (e) {
-                showToast("Erro crítico de comunicação", true);
+const fileInput = document.getElementById('pdfFile');
+if (fileInput) {
+    fileInput.addEventListener('change', async function() {
+        const file = this.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append("edital", file);
+        showToast("Iniciando Ingestão Adaptativa...");
+        try {
+            const response = await fetch('/api/upload-edital', { method: 'POST', body: formData });
+            if (response.ok) {
+                showToast("Edital processado com sucesso!");
+                
+                // 🚀 O POP-UP DE ALERTA CIRÚRGICO E OBRIGATÓRIO
+                alert("⚠️ ATENÇÃO OPERADOR:\n\nTodas as disciplinas extraídas deste edital foram cadastradas com o peso padrão MÍNIMO (Baixo Peso - 1).\n\nPara que o motor Iudex XII calcule suas revisões com precisão, você DEVE ajustar o peso de cada disciplina no Grid conforme a relevância real no certame.");
+                
+                // O carregamento do Grid só ocorre após o usuário dar o 'OK' no alerta
+                await loadData();
+            } else {
+                showToast("Falha estrutural no processamento do arquivo", true);
             }
-            this.value = '';
-        });
-    }
+        } catch (e) {
+            showToast("Erro crítico de comunicação", true);
+        }
+        this.value = '';
+    });
+}
 
     // ══════════════════════════════════════════════════════════════
     // VAVILOV IUDEX XII - Ações de Revisão e Painel Inteligente

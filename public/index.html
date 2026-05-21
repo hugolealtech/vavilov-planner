@@ -36,11 +36,17 @@
         </div>
     </div>
 
-    <div style="background: var(--surf); padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--brd); display: flex; gap: 12px; align-items: center;">
+   <div style="background: var(--surf); padding: 15px; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--brd); display: flex; gap: 12px; align-items: center;">
         <h4 style="margin:0; color:#fff; font-size:13px; min-width:120px;">⚙️ Painel de Adição:</h4>
         <input type="text" id="manDisciplina" placeholder="Disciplina (Ex: Direito Administrativo)" style="background:#0d1117; color:#fff; border:1px solid var(--brd); padding:8px; border-radius:4px; flex:1; font-size:13px;">
         <input type="text" id="manTopico" placeholder="Tópico de Estudo / Artigos / Conteúdo" style="background:#0d1117; color:#fff; border:1px solid var(--brd); padding:8px; border-radius:4px; flex:2; font-size:13px;">
-        <input type="number" id="manPeso" value="1" min="1" title="Peso de relevância da disciplina" style="background:#0d1117; color:#fff; border:1px solid var(--brd); padding:8px; border-radius:4px; width:70px; text-align:center; font-size:13px;">
+        
+        <select id="manPeso" title="Peso de relevância da disciplina" style="background:#0d1117; color:#fff; border:1px solid var(--brd); padding:8px; border-radius:4px; width:140px; font-size:13px; cursor: pointer;">
+            <option value="1" selected>Baixo Peso (1)</option>
+            <option value="3">Médio Peso (3)</option>
+            <option value="5">Alto Peso (5)</option>
+        </select>
+        
         <button class="upload-btn" style="padding:8px 20px; background: var(--succ); color: #fff;" onclick="adicionarTopicoManual()">Salvar no Planner</button>
     </div>
 
