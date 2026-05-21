@@ -77,6 +77,19 @@ router.post('/topics/:id/child', (req, res) => {
         });
     });
 });
+// FIX B5: ao deletar um pai, soft-deleta também todos os filhos e netos recursivamente
+function softDeleteCascade(id, timestamp, callback) {
+    db.run(`UPDATE edital_atual SET is_deleted = 1, deleted_at = ? WHERE id = ?`, [timestamp, id], function() {
+        db.all(`SELECT id FROM edital_atual WHERE parent_id = ? AND is_deleted = 0`, [id], (err, filhos) => {
+            if (err || !filhos.length) { callback(); return; }
+            let pending = filhos.length;
+            filhos.forEach(f => {
+                softDeleteCascade(f.id, timestamp, () => { if (--pending === 0) callback(); });
+            });
+        });
+    });
+}
+
 router.delete('/topics/:id', (req, res) => {
     const id = req.params.id;
     const timestamp = new Date().toISOString();
@@ -84,13 +97,10 @@ router.delete('/topics/:id', (req, res) => {
     db.get("SELECT * FROM edital_atual WHERE id = ?", [id], (err, row) => {
         if (err || !row) return res.status(404).json({ error: "Registro não encontrado." });
 
-        db.run(`UPDATE edital_atual SET is_deleted = 1, deleted_at = ? WHERE id = ?`, [timestamp, id], function(upErr) {
-            if (upErr) return res.status(500).json({ error: upErr.message });
-
+        softDeleteCascade(id, timestamp, () => {
             db.run(`INSERT INTO lixeira_eventos (entidade_tipo, entidade_id, dados_json) VALUES (?, ?, ?)`,
                 ['topico', id, JSON.stringify(row)]);
-
-            res.json({ success: true, message: "Movido para a lixeira." });
+            res.json({ success: true, message: "Movido para a lixeira (com filhos)." });
         });
     });
 });
@@ -271,6 +281,9 @@ router.post('/upload-edital', upload.single('edital'), async (req, res) => {
         console.error(`[PARSER CRITICAL ERROR] ${err.message}`);
         res.status(500).json({ error: err.message }); 
     }
+});
+router.get('/tutorial', (req, res) => {
+    res.render('tutorial');
 });
 
 module.exports = router;

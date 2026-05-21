@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vavilov OS — Manual do Operador</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg:      #080c10;
+    --surf:    #0d1117;
+    --surf2:   #111820;
+    --brd:     #1e2a35;
+    --acc:     #00d4ff;
+    --acc2:    #7b61ff;
+    --succ:    #00e676;
+    --warn:    #ffb300;
+    --danger:  #ff4444;
+    --txt:     #c8d8e8;
+    --muted:   #4a6070;
+    --mono:    'Space Mono', monospace;
+    --sans:    'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--txt);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── grid background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── hero ── */
+  .hero {
+    position: relative;
+    text-align: center;
+    padding: 80px 20px 60px;
+    overflow: hidden;
+    z-index: 1;
+  }
+
+  .hero-glow {
+    position: absolute;
+    top: -60px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 300px;
+    background: radial-gradient(ellipse, rgba(0,212,255,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--acc);
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.1s forwards;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -1px;
+    color: #fff;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.25s forwards;
+  }
+
+  .hero h1 span {
+    background: linear-gradient(90deg, var(--acc), var(--acc2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    margin-top: 18px;
+    font-size: 1rem;
+    color: var(--muted);
+    max-width: 500px;
+    margin-inline: auto;
+    line-height: 1.6;
+    opacity: 0;
+    animation: fadeUp 0.6s 0.4s forwards;
+  }
+
+  .version-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 24px;
+    padding: 6px 14px;
+    border: 1px solid var(--brd);
+    border-radius: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0;
+    animation: fadeUp 0.6s 0.55s forwards;
+  }
+  .version-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--succ);
+    box-shadow: 0 0 8px var(--succ);
+  }
+
+  /* ── nav ── */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(8,12,16,0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--brd);
+    padding: 0 32px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+
+  .nav a {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 14px 18px;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .nav a:hover { color: var(--acc); border-bottom-color: var(--acc); }
+
+  /* ── layout ── */
+  .content {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* ── sections ── */
+  .section {
+    margin-top: 64px;
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  .section.visible { opacity: 1; transform: none; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--brd);
+  }
+
+  .section-num {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--acc);
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 4px;
+    padding: 3px 8px;
+    letter-spacing: 2px;
+    flex-shrink: 0;
+  }
+
+  .section-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  /* ── step cards ── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step {
+    background: var(--surf);
+    border: 1px solid var(--brd);
+    border-radius: 10px;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 16px;
+    align-items: start;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .step:hover {
+    border-color: rgba(0,212,255,0.3);
+    background: var(--surf2);
+  }
+
+  .step-icon {
+    width: 48px; height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .step-icon.blue   { background: rgba(0,212,255,0.1); }
+  .step-icon.purple { background: rgba(123,97,255,0.1); }
+  .step-icon.green  { background: rgba(0,230,118,0.1); }
+  .step-icon.yellow { background: rgba(255,179,0,0.1); }
+  .step-icon.red    { background: rgba(255,68,68,0.1); }
+
+  .step-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .step-desc {
+    font-size: 0.85rem;
+    color: var(--txt);
+    line-height: 1.65;
+  }
+
+  .step-desc code {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    background: rgba(0,212,255,0.08);
+    color: var(--acc);
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(0,212,255,0.15);
+  }
+
+  /* ── cycle diagram ── */
+  .cycle {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 8px 0;
+  }
+
+  .cycle-item {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .cycle-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 52px;
+    flex-shrink: 0;
+  }
+
+  .cycle-dot {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+
+  .cycle-line {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+    background: var(--brd);
+    margin: 2px 0;
+  }
+  .cycle-item:last-child .cycle-line { display: none; }
+
+  .cycle-body {
+    flex: 1;
+    padding: 6px 0 20px 12px;
+  }
+
+  .cycle-label {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 3px;
+  }
+
+  .cycle-note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── rules grid ── */
+  .rules {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+
+  .rule {
+    padding: 18px 20px;
+    border-radius: 10px;
+    border: 1px solid var(--brd);
+    background: var(--surf);
+    font-size: 0.84rem;
+    line-height: 1.6;
+    color: var(--txt);
+  }
+
+  .rule-icon {
+    font-size: 20px;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .rule strong {
+    display: block;
+    font-size: 0.9rem;
+    color: #fff;
+    margin-bottom: 5px;
+  }
+
+  .rule.do   { border-left: 3px solid var(--succ); }
+  .rule.dont { border-left: 3px solid var(--danger); }
+  .rule.warn { border-left: 3px solid var(--warn); }
+
+  /* ── weight table ── */
+  .table-wrap {
+    background: var(--surf);
+    border: 1px solid var(--brd);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .wtable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .wtable th {
+    background: #0a0e14;
+    padding: 12px 16px;
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--brd);
+  }
+
+  .wtable td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(30,42,53,0.6);
+    color: var(--txt);
+    vertical-align: middle;
+  }
+  .wtable tr:last-child td { border-bottom: none; }
+  .wtable tr:hover td { background: var(--surf2); }
+
+  .peso-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  /* ── SM-2 intervals ── */
+  .intervals {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .interval-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 16px;
+    background: var(--surf);
+    border: 1px solid var(--brd);
+    border-radius: 8px;
+    min-width: 80px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+  }
+  .interval-chip strong {
+    font-family: var(--mono);
+    font-size: 1rem;
+    color: var(--acc);
+  }
+
+  /* ── alert box ── */
+  .alert {
+    padding: 16px 20px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin: 16px 0;
+  }
+  .alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .alert.info    { background: rgba(0,212,255,0.07);  border: 1px solid rgba(0,212,255,0.2); }
+  .alert.success { background: rgba(0,230,118,0.07);  border: 1px solid rgba(0,230,118,0.2); }
+  .alert.warning { background: rgba(255,179,0,0.07);  border: 1px solid rgba(255,179,0,0.2); }
+  .alert.danger  { background: rgba(255,68,68,0.07);  border: 1px solid rgba(255,68,68,0.2); }
+
+  /* ── flow diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+
+  .flow-node {
+    background: var(--surf2);
+    border: 1px solid var(--brd);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 0.82rem;
+    text-align: center;
+    color: #fff;
+    min-width: 100px;
+  }
+  .flow-node.accent { border-color: rgba(0,212,255,0.4); color: var(--acc); }
+
+  .flow-arrow {
+    padding: 0 8px;
+    color: var(--muted);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* ── faq ── */
+  .faq-item {
+    border: 1px solid var(--brd);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: var(--surf);
+  }
+
+  .faq-q {
+    padding: 16px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: #fff;
+    font-weight: 600;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .faq-q:hover { background: var(--surf2); }
+
+  .faq-chevron {
+    font-size: 12px;
+    color: var(--muted);
+    transition: transform 0.25s;
+    flex-shrink: 0;
+  }
+  .faq-item.open .faq-chevron { transform: rotate(180deg); }
+
+  .faq-a {
+    display: none;
+    padding: 0 20px 16px;
+    font-size: 0.84rem;
+    color: var(--txt);
+    line-height: 1.7;
+    border-top: 1px solid var(--brd);
+    padding-top: 14px;
+  }
+  .faq-item.open .faq-a { display: block; }
+
+  /* ── footer ── */
+  .footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 40px 20px;
+    border-top: 1px solid var(--brd);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* ── animations ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* ── scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--brd); border-radius: 3px; }
+
+  /* ── responsive ── */
+  @media (max-width: 600px) {
+    .step { grid-template-columns: 1fr; }
+    .step-icon { width: 36px; height: 36px; font-size: 18px; }
+    .flow { gap: 4px; }
+    .flow-node { min-width: 80px; padding: 8px 10px; font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-eyebrow">// manual do operador</div>
+  <h1>Vavilov OS<br><span>Guia de Uso Completo</span></h1>
+  <p class="hero-sub">Tudo que você precisa saber para usar o sistema de estudo inteligente corretamente — do cadastro ao algoritmo.</p>
+  <div class="version-badge">v2.0 — Iudex XII Ativo</div>
+</div>
+
+<!-- NAV -->
+<nav class="nav">
+  <a href="#visao-geral">Visão Geral</a>
+  <a href="#fase1">1. Edital</a>
+  <a href="#fase2">2. Estudar</a>
+  <a href="#fase3">3. Revisões</a>
+  <a href="#fase4">4. Iudex XII</a>
+  <a href="#timeblock">Timeblock</a>
+  <a href="#regras">Regras</a>
+  <a href="#pesos">Pesos</a>
+  <a href="#faq">FAQ</a>
+</nav>
+
+<div class="content">
+
+  <!-- VISÃO GERAL -->
+  <section class="section" id="visao-geral">
+    <div class="section-header">
+      <span class="section-num">00</span>
+      <h2 class="section-title">Como o sistema funciona</h2>
+    </div>
+
+    <div class="alert info">
+      <span class="alert-icon">💡</span>
+      <div>O Vavilov OS é um <strong>copiloto de estudos</strong>, não um automatizador. Você informa o que estudou — o sistema calcula quando revisar. A disciplina de marcar corretamente é o que faz a curva de esquecimento trabalhar a seu favor.</div>
+    </div>
+
+    <div class="flow" style="margin-top:24px;">
+      <div class="flow-node accent">Cadastra<br>Edital</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Estuda e<br>marca ✅</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Revisa em<br>24h / 7d / 30d</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">Iudex calcula<br>próximo passo</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node accent">Timeblock<br>agendado</div>
+    </div>
+
+    <p style="margin-top:20px; font-size:0.85rem; color:var(--muted); line-height:1.7;">
+      O sistema tem três abas. Cada uma tem um papel específico no seu fluxo de estudo:
+    </p>
+
+    <div class="steps" style="margin-top:16px;">
+      <div class="step">
+        <div class="step-icon blue">≡</div>
+        <div>
+          <div class="step-title">Grid Excel — Central de Entrada</div>
+          <div class="step-desc">Onde você cadastra disciplinas, tópicos e subtópicos. Marca o que estudou, faz revisões e configura os pesos. É a <strong>fonte de verdade</strong> do sistema.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon purple">📅</div>
+        <div>
+          <div class="step-title">Calendário (Timeblock) — Agenda Visual</div>
+          <div class="step-desc">Mostra o que está agendado para cada dia. Você arrasta tópicos do backlog para os horários. Os eventos ficam verdes quando concluídos.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon green">📊</div>
+        <div>
+          <div class="step-title">Painel Analítico — Inteligência Iudex XII</div>
+          <div class="step-desc">Mostra o heatmap de produtividade, o rastro de sessões e a tabela do motor Iudex com as revisões calculadas por algoritmo SM-2.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FASE 1 -->
+  <section class="section" id="fase1">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2 class="section-title">Montando o Edital</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-icon blue">📄</div>
+        <div>
+          <div class="step-title">Opção A — Ingerir PDF do edital</div>
+          <div class="step-desc">Clique em <code>+ Ingerir Edital (IA)</code> e selecione o PDF do seu concurso. O Motor A tenta detectar disciplinas em CAIXA ALTA. Se não encontrar nada, o Motor B Adaptativo entra em ação buscando palavras-chave como "direito", "constitucional", "informática" etc. O resultado aparece em <em>Caixa de Entrada</em>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon blue">✏️</div>
+        <div>
+          <div class="step-title">Opção B — Adicionar manualmente</div>
+          <div class="step-desc">Use o painel de adição no topo: preencha <code>Disciplina</code>, <code>Tópico</code> e <code>Peso</code>, depois clique em <strong>Salvar no Planner</strong>. Disciplinas com o mesmo nome são agrupadas automaticamente na mesma seção do Grid.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon yellow">🌿</div>
+        <div>
+          <div class="step-title">Criando subtópicos filhos</div>
+          <div class="step-desc">Clique no botão <code style="color:var(--acc)">+</code> azul ao lado do 🗑️ em qualquer linha. Um modal aparece para você nomear o subtópico filho. Exemplo: <em>Direito Administrativo → Administração Indireta → Autarquias</em>. Não há limite de profundidade.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon yellow">⚖️</div>
+        <div>
+          <div class="step-title">Configure os pesos com cuidado</div>
+          <div class="step-desc">O <strong>Peso</strong> (1–5) é o dado mais importante do sistema. Ele alimenta diretamente o algoritmo Iudex. Deixar tudo em peso 1 faz o algoritmo interpretar que você nunca aprendeu bem nada, gerando revisões diárias eternas. <a href="#pesos" style="color:var(--acc)">Ver tabela de pesos →</a></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FASE 2 -->
+  <section class="section" id="fase2">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2 class="section-title">Estudando e marcando</h2>
+    </div>
+
+    <div class="alert success">
+      <span class="alert-icon">✅</span>
+      <div>Quando você termina de estudar um tópico, marque o <strong>checkbox da coluna "Estudo"</strong>. Isso faz três coisas de uma vez: registra no banco, agenda o tópico no Timeblock de hoje com o horário atual, e alimenta o heatmap e o rastro no painel analítico.</div>
+    </div>
+
+    <div class="steps" style="margin-top:20px;">
+      <div class="step">
+        <div class="step-icon green">☑️</div>
+        <div>
+          <div class="step-title">Marque no Grid, não no Calendário</div>
+          <div class="step-desc">O checkbox do Grid é a forma principal. Ele registra a sessão corretamente. Você também pode clicar num evento no Calendário para marcá-lo, mas o fluxo primário é o Grid.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon green">📍</div>
+        <div>
+          <div class="step-title">O agendamento automático de hoje</div>
+          <div class="step-desc">Ao marcar Estudo, se o tópico ainda não tinha data agendada, o sistema coloca automaticamente no Timeblock <em>de hoje</em>. Se já tinha uma data agendada (você planejou com antecedência), ele respeita a data existente e não sobrescreve.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon blue">🔁</div>
+        <div>
+          <div class="step-title">Desmarcar é permitido</div>
+          <div class="step-desc">Se marcou por engano, desmarcar o checkbox reverte o estado visual imediatamente. O evento no Calendário é atualizado junto.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FASE 3 -->
+  <section class="section" id="fase3">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2 class="section-title">O ciclo de revisão espaçada</h2>
+    </div>
+
+    <div class="alert warning">
+      <span class="alert-icon">⚠️</span>
+      <div><strong>Regra de ouro:</strong> as três revisões devem ser marcadas <strong>em ordem sequencial</strong> — Rev 24h → Rev 7d → Rev 30d. Pular etapas ou marcar fora de ordem gera intervalos incorretos no algoritmo.</div>
+    </div>
+
+    <div class="cycle" style="margin-top:24px;">
+      <div class="cycle-item">
+        <div class="cycle-left">
+          <div class="cycle-dot" style="background:var(--acc);">E</div>
+          <div class="cycle-line"></div>
+        </div>
+        <div class="cycle-body">
+          <div class="cycle-label">Estudo inicial</div>
+          <div class="cycle-note">Você estuda o tópico. Marca ✅ Estudo no Grid. Sistema registra hoje como data base. Estágio 1 ativado.</div>
+        </div>
+      </div>
+      <div class="cycle-item">
+        <div class="cycle-left">
+          <div class="cycle-dot" style="background:#4fc3f7;">1</div>
+          <div class="cycle-line"></div>
+        </div>
+        <div class="cycle-body">
+          <div class="cycle-label">Revisão 24h — no dia seguinte</div>
+          <div class="cycle-note">Marca ✅ Rev 24h. O sistema pergunta se quer agendar a próxima revisão em +1 dia no Timeblock. Confirme. Estágio 2 ativado.</div>
+        </div>
+      </div>
+      <div class="cycle-item">
+        <div class="cycle-left">
+          <div class="cycle-dot" style="background:var(--acc2);">7</div>
+          <div class="cycle-line"></div>
+        </div>
+        <div class="cycle-body">
+          <div class="cycle-label">Revisão 7 dias — uma semana depois</div>
+          <div class="cycle-note">Marca ✅ Rev 7d. O sistema pergunta se quer agendar em +7 dias. Confirme. Estágio 3 ativado.</div>
+        </div>
+      </div>
+      <div class="cycle-item">
+        <div class="cycle-left">
+          <div class="cycle-dot" style="background:var(--succ);">30</div>
+          <div class="cycle-line"></div>
+        </div>
+        <div class="cycle-body">
+          <div class="cycle-label">Revisão 30 dias — um mês depois</div>
+          <div class="cycle-note">Marca ✅ Rev 30d. Confirme o agendamento. Estágio 4 ativado. A partir daqui, o Iudex XII assume o cálculo dos intervalos seguintes.</div>
+        </div>
+      </div>
+      <div class="cycle-item">
+        <div class="cycle-left">
+          <div class="cycle-dot" style="background:var(--warn);">∞</div>
+          <div class="cycle-line"></div>
+        </div>
+        <div class="cycle-body">
+          <div class="cycle-label">Iudex XII — intervalos calculados</div>
+          <div class="cycle-note">O motor SM-2 usa o peso do tópico como fator de qualidade e multiplica o intervalo pelo Fator de Facilidade. Os intervalos crescem: 1 → 3 → 7 → meses. Abra o Painel Analítico para ver e agendar.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 24px;">
+      <p style="font-size:0.85rem; color:var(--muted); margin-bottom:12px;">Intervalos gerados pelo Iudex XII por peso (após estágio 4):</p>
+      <div class="intervals">
+        <div class="interval-chip"><strong>Peso 1</strong>reset diário</div>
+        <div class="interval-chip"><strong>Peso 2</strong>reset diário</div>
+        <div class="interval-chip"><strong>Peso 3</strong>~7 dias</div>
+        <div class="interval-chip"><strong>Peso 4</strong>~14 dias</div>
+        <div class="interval-chip"><strong>Peso 5</strong>~21+ dias</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FASE 4 -->
+  <section class="section" id="fase4">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <h2 class="section-title">Painel Analítico — Motor Iudex XII</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-icon purple">🧠</div>
+        <div>
+          <div class="step-title">Quando abrir o Painel</div>
+          <div class="step-desc">O Iudex só roda quando você abre a aba. Abra o Painel Analítico diariamente — idealmente ao começar a sessão de estudo — para ver quais tópicos precisam de revisão hoje.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon red">🔴</div>
+        <div>
+          <div class="step-title">Revisões urgentes (vermelho)</div>
+          <div class="step-desc">Tópicos com intervalo calculado de 0–1 dia aparecem em <span style="color:var(--danger)">🔴 Urgente hoje</span>. Use o botão <code>Agendar X Urgentes</code> para colocar todos no Timeblock de hoje com um clique.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon yellow">⚠️</div>
+        <div>
+          <div class="step-title">Revisões próximas (amarelo)</div>
+          <div class="step-desc">Tópicos com 2–3 dias aparecem em <span style="color:var(--warn)">⚠️ Em X dias</span>. Use <code>+ Agendar</code> individualmente para cada um.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon green">📈</div>
+        <div>
+          <div class="step-title">Heatmap e Rastro Digital</div>
+          <div class="step-desc">O heatmap mostra os últimos 84 dias de atividade. Cada quadrado verde representa sessões registradas naquele dia. O Rastro mostra as últimas 15 ações com data, tipo e tópico.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert info" style="margin-top:20px;">
+      <span class="alert-icon">ℹ️</span>
+      <div>O Iudex XII só processa tópicos com <code>Estudo</code> marcado. Se um tópico não aparece na tabela, verifique se o checkbox de conclusão está marcado no Grid.</div>
+    </div>
+  </section>
+
+  <!-- TIMEBLOCK -->
+  <section class="section" id="timeblock">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <h2 class="section-title">Usando o Timeblock (Calendário)</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-icon purple">↙️</div>
+        <div>
+          <div class="step-title">Backlog lateral — arrastar para agendar</div>
+          <div class="step-desc">O painel esquerdo mostra todos os tópicos ainda não agendados. Arraste qualquer item para um horário no calendário. O sistema salva automaticamente a data e hora no banco. O item some do backlog.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon purple">🎯</div>
+        <div>
+          <div class="step-title">Filtro de disciplina</div>
+          <div class="step-desc">O select <em>Todas as Disciplinas</em> no topo filtra tanto o Grid quanto o Timeblock e o backlog simultaneamente. Use para focar em uma matéria por vez.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon green">✅</div>
+        <div>
+          <div class="step-title">Marcar como concluído no Calendário</div>
+          <div class="step-desc">Clique em qualquer evento do calendário para abrir o diálogo de conclusão. Confirme e o evento fica verde com ✅. O Grid é atualizado junto.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-icon blue">🗓️</div>
+        <div>
+          <div class="step-title">Quatro modos de visualização</div>
+          <div class="step-desc">Use os botões no topo do calendário: <code>Mês</code> para visão macro, <code>Semana</code> para planejamento semanal detalhado, <code>Dia</code> para focar no dia atual, <code>☰ Lista</code> para ver todos os eventos cronologicamente.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REGRAS -->
+  <section class="section" id="regras">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <h2 class="section-title">Regras de uso — o que fazer e o que evitar</h2>
+    </div>
+
+    <div class="rules">
+      <div class="rule do">
+        <span class="rule-icon">✅</span>
+        <strong>Marque o Estudo assim que terminar</strong>
+        O registro precisa ser feito no dia real de estudo para os intervalos de revisão serem calculados corretamente.
+      </div>
+      <div class="rule do">
+        <span class="rule-icon">✅</span>
+        <strong>Configure os pesos reais do edital</strong>
+        Consulte o edital: quantas questões caem de cada disciplina? Isso vira o peso. Peso correto = algoritmo correto.
+      </div>
+      <div class="rule do">
+        <span class="rule-icon">✅</span>
+        <strong>Abra o Painel Analítico todo dia</strong>
+        O Iudex não roda em background. Abrir a aba é o gatilho. Faça isso antes de começar a estudar.
+      </div>
+      <div class="rule do">
+        <span class="rule-icon">✅</span>
+        <strong>Confirme os agendamentos de revisão</strong>
+        Quando clicar em Rev 24h/7d/30d, confirme o prompt de agendamento. Isso é o que coloca a revisão no Timeblock.
+      </div>
+      <div class="rule dont">
+        <span class="rule-icon">❌</span>
+        <strong>Não pule etapas de revisão</strong>
+        Não marque Rev 7d sem ter marcado Rev 24h. O algoritmo usa o estágio atual para calcular o próximo intervalo.
+      </div>
+      <div class="rule dont">
+        <span class="rule-icon">❌</span>
+        <strong>Não deixe tudo com peso 1</strong>
+        Peso 1 = qualidade baixa no SM-2 = reset diário eterno. O algoritmo nunca vai conseguir espaçar os intervalos.
+      </div>
+      <div class="rule dont">
+        <span class="rule-icon">❌</span>
+        <strong>Não marque revisão sem ter estudado</strong>
+        O Iudex só processa tópicos com <em>Estudo</em> marcado. Marcar revisões em tópicos não concluídos não gera dados úteis.
+      </div>
+      <div class="rule warn">
+        <span class="rule-icon">⚠️</span>
+        <strong>Ao deletar um pai, os filhos somem juntos</strong>
+        Deletar um tópico raiz remove todos os subtópicos filhos e netos. O sistema avisa quantos serão removidos.
+      </div>
+      <div class="rule warn">
+        <span class="rule-icon">⚠️</span>
+        <strong>"Limpar Tudo" é irreversível na prática</strong>
+        O botão vermelho move tudo para a lixeira do banco. Não há undo na interface. Use com cautela.
+      </div>
+    </div>
+  </section>
+
+  <!-- PESOS -->
+  <section class="section" id="pesos">
+    <div class="section-header">
+      <span class="section-num">07</span>
+      <h2 class="section-title">Tabela de Pesos — como calibrar</h2>
+    </div>
+
+    <p style="font-size:0.85rem; color:var(--muted); margin-bottom:16px; line-height:1.7;">
+      O Peso é o único parâmetro que você controla no algoritmo SM-2. Ele determina a qualidade da revisão e, consequentemente, o espaçamento entre sessões. Use o edital como referência: olhe quantas questões ou qual percentual de pontos cada disciplina representa.
+    </p>
+
+    <div class="table-wrap">
+      <table class="wtable">
+        <thead>
+          <tr>
+            <th>Peso</th>
+            <th>Quando usar</th>
+            <th>Comportamento no Iudex</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="peso-badge" style="background:rgba(255,68,68,0.15);color:#ff4444;">1</span></td>
+            <td>Matéria extra, raramente cai, valor mínimo</td>
+            <td style="color:var(--danger);">Reset diário — SM-2 interpreta como aprendizado fraco. Intervalos não crescem.</td>
+          </tr>
+          <tr>
+            <td><span class="peso-badge" style="background:rgba(255,120,0,0.15);color:#ff7800;">2</span></td>
+            <td>Matéria secundária, cai pouco</td>
+            <td style="color:#ff7800;">Reset diário — ainda abaixo do limiar de progressão (qualidade < 3).</td>
+          </tr>
+          <tr>
+            <td><span class="peso-badge" style="background:rgba(255,179,0,0.15);color:var(--warn);">3</span></td>
+            <td>Matéria intermediária, percentual médio do edital</td>
+            <td style="color:var(--warn);">Progressão real começa. Intervalos crescem após revisões: 1 → 3 → 7 → ~10 dias.</td>
+          </tr>
+          <tr>
+            <td><span class="peso-badge" style="background:rgba(0,230,118,0.1);color:var(--succ);">4</span></td>
+            <td>Matéria importante, alto índice de cobrança</td>
+            <td style="color:var(--succ);">Bons intervalos. Após estágio 4: ~14 dias e crescendo por fator 2.5+.</td>
+          </tr>
+          <tr>
+            <td><span class="peso-badge" style="background:rgba(0,212,255,0.1);color:var(--acc);">5</span></td>
+            <td>Matéria principal, muitas questões, decisiva para aprovação</td>
+            <td style="color:var(--acc);">Intervalos máximos. Fator de facilidade alto. SM-2 interpreta domínio excelente.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="alert warning" style="margin-top:16px;">
+      <span class="alert-icon">💡</span>
+      <div>Dica prática: pesquise as provas anteriores do seu concurso e conte quantas questões caíram de cada disciplina. Divida pelo total e use isso para calibrar o peso. 30% das questões = Peso 5. 5% = Peso 2.</div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section" id="faq">
+    <div class="section-header">
+      <span class="section-num">08</span>
+      <h2 class="section-title">Perguntas frequentes</h2>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Por que meu tópico não aparece no Painel Iudex? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">O Iudex XII só processa tópicos com o checkbox <strong>Estudo</strong> marcado (campo <code>concluido = 1</code>). Verifique se o tópico está marcado no Grid. Também certifique-se de que o tópico não foi deletado — a API filtra automaticamente os deletados.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Cancelei o agendamento de revisão mas o checkbox ficou marcado. O que acontece? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">A partir da v2.0, ao cancelar o confirm de revisão, o checkbox é revertido visualmente e nada é salvo no banco. O estado permanece exatamente como estava antes do clique.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">O tópico já tinha uma data agendada e marquei Estudo. Ele sobrescreveu? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">Não. O agendamento automático de hoje só ocorre quando o tópico ainda não tem <code>data_agendada</code>. Se já havia uma data (você planejou com antecedência), o sistema respeita e não sobrescreve.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Posso usar o sistema sem seguir a ordem de revisões? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">Tecnicamente sim, mas o algoritmo vai calcular intervalos incorretos. O SM-2 usa o estágio atual (qual revisão foi feita por último) para determinar o próximo intervalo. Se você marcar Rev 30d diretamente, o sistema interpretará que está no estágio 4 com intervalo base de 30 dias, podendo gerar intervalos excessivamente longos logo de cara.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Como o PDF é processado? E se não funcionar? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">O sistema usa dois motores em sequência. O Motor A busca linhas em CAIXA ALTA (padrão de editais formais). Se retornar 0 resultados, o Motor B Adaptativo entra em ação usando palavras-chave de disciplinas jurídicas/técnicas comuns. Se nenhum funcionar, o PDF provavelmente tem formatação muito não-convencional — adicione os tópicos manualmente.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Deletei um tópico pai por engano. Os filhos foram juntos? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">Sim. A partir da v2.0, deletar um pai remove todos os filhos e netos recursivamente (soft delete — eles vão para a lixeira no banco, não são apagados fisicamente). O sistema avisa quantos serão removidos antes de confirmar.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">O heatmap está vazio mas já estudei bastante. Por quê? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">O heatmap só é populado quando o campo <strong>Estudo</strong> ou uma das <strong>Revisões</strong> são marcados no Grid — isso dispara o registro em <code>study_sessions</code> no banco. Se você marcou diretamente no Calendário sem passar pelo Grid, o evento de sessão pode não ter sido registrado. Use o Grid como ponto primário de marcação.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q">Como ligar e desligar o sistema no dia a dia? <span class="faq-chevron">▼</span></div>
+      <div class="faq-a">Para parar: <code>docker stop vavilov-app</code>. Para ligar novamente: <code>docker start vavilov-app</code>. Seus dados estão no volume <code>./data</code> e são persistidos entre reinicializações. Nunca use <code>docker rm</code> sem fazer backup do diretório <code>data/</code>.</div>
+    </div>
+  </section>
+
+</div><!-- /content -->
+
+<footer class="footer">
+  VAVILOV OS — MANUAL DO OPERADOR &nbsp;|&nbsp; v2.0 IUDEX XII &nbsp;|&nbsp; CURVA DE ESQUECIMENTO ATIVA
+  <p>Criado por Hugo Leal</p>
+</footer>
+
+<script>
+  // ── Intersection Observer para animações de entrada ──
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.section').forEach(s => observer.observe(s));
+
+  // ── FAQ accordion ──
+  document.querySelectorAll('.faq-q').forEach(q => {
+    q.addEventListener('click', () => {
+      const item = q.closest('.faq-item');
+      const wasOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    });
+  });
+
+  // ── Nav active highlight on scroll ──
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks  = document.querySelectorAll('.nav a');
+  window.addEventListener('scroll', () => {
+    let cur = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 120) cur = s.id;
+    });
+    navLinks.forEach(a => {
+      a.style.color = a.getAttribute('href') === `#${cur}` ? 'var(--acc)' : '';
+      a.style.borderBottomColor = a.getAttribute('href') === `#${cur}` ? 'var(--acc)' : '';
+    });
+  }, { passive: true });
+</script>
+</body>
+</html>
